@@ -42,8 +42,8 @@ import math
 from PIL import Image
 
 
-SCREEN_WIDTH: int = 1024
-SCREEN_HEIGHT: int = 768
+SCREEN_WIDTH: int = 800
+SCREEN_HEIGHT: int = 600
 SCALE: int = 1
 WINDOW_WIDTH: int = SCREEN_WIDTH * SCALE
 WINDOW_HEIGHT: int = SCREEN_HEIGHT * SCALE
@@ -283,6 +283,8 @@ def update_events(dt: float, pos_x: float, pos_y: float, dir_x: float, dir_y: fl
     move_speed: float = dt * 5.0
     rot_speed: float = dt * 3.0
 
+    if dt > 1:
+        return pos_x, pos_y, dir_x, dir_y, plane_x, plane_y
     pressed = pygame.key.get_pressed()
 
     new_xpos_plus: int = int(pos_x + dir_x * move_speed)
@@ -320,6 +322,47 @@ def update_events(dt: float, pos_x: float, pos_y: float, dir_x: float, dir_y: fl
     return pos_x, pos_y, dir_x, dir_y, plane_x, plane_y
 
 
+class LeftPress:
+    def __getitem__(self, idx):
+        return idx == pygame.K_LEFT
+
+
+def main_loop(pos_x, pos_y, dir_x, dir_y, plane_x, plane_y, display, surface, clock, colormap, w, h, buffer):
+    # Raycasting for floor/ceiling textures
+    for y in range(h >> 1, h):
+        do_continue, fstep_x, fstep_y, floor_x, floor_y = floorcast_y(y, w, h, dir_x, plane_x, dir_y, plane_y,
+              pos_x, pos_y)
+
+        if do_continue:
+            # Choose texture, draw pixel
+            floor_texture = colormap[3]
+            ceiling_texture = colormap[6]
+
+            for x in range(w):
+                floorcast_x2(buffer, x, y, h, floor_texture, ceiling_texture, floor_x, floor_y, fstep_x, fstep_y)
+
+    # Raycasting for wall textures
+    for x in range(w):
+        do_continue, tex_pos, y1, y2, step, tex_num, tex_x = wallcast(x, w, h, dir_x, plane_x, dir_y, plane_y,
+              pos_x, pos_y)
+
+        if do_continue:
+            texture = colormap[tex_num]
+
+            for y in range(y1, y2):
+                copy_color(buffer, x, y, h, texture, tex_x, int(tex_pos + step * (y - y1)) & (TEX_HEIGHT - 1))
+
+    # Update display
+    fps: float = clock.get_fps()
+    caption: str = "Textured Raycaster | FPS = {0:.2f}".format(fps)
+    update_display(surface, display, buffer, caption)
+    buffer[:] = b'\x00' * len(buffer)
+
+    # Grab user input
+    dt: float = clock.tick(FPS) * 0.001
+    return update_events(dt, pos_x, pos_y, dir_x, dir_y, plane_x, plane_y)
+
+
 def main() -> None:
     """ Setup and main loop.
     """
@@ -337,14 +380,14 @@ def main() -> None:
     clock = pygame.time.Clock()
 
     colormap = [
-        load_image("pics/eagle.png"),
-        load_image("pics/redbrick.png"),
-        load_image("pics/purplestone.png"),
-        load_image("pics/greystone.png"),
-        load_image("pics/bluestone.png"),
-        load_image("pics/mossy.png"),
-        load_image("pics/wood.png"),
-        load_image("pics/colorstone.png"),
+        load_image(os.path.dirname(__file__) + "/pics/eagle.png"),
+        load_image(os.path.dirname(__file__) + "/pics/redbrick.png"),
+        load_image(os.path.dirname(__file__) + "/pics/purplestone.png"),
+        load_image(os.path.dirname(__file__) + "/pics/greystone.png"),
+        load_image(os.path.dirname(__file__) + "/pics/bluestone.png"),
+        load_image(os.path.dirname(__file__) + "/pics/mossy.png"),
+        load_image(os.path.dirname(__file__) + "/pics/wood.png"),
+        load_image(os.path.dirname(__file__) + "/pics/colorstone.png"),
     ]
 
     # buffer: list = np.empty((SCREEN_WIDTH, SCREEN_HEIGHT, 3), dtype="uint8").tolist()
@@ -353,38 +396,7 @@ def main() -> None:
     buffer = bytearray(b"0" * w * h * 3)
 
     while True:
-        # Raycasting for floor/ceiling textures
-        for y in range(h >> 1, h):
-            do_continue, fstep_x, fstep_y, floor_x, floor_y = floorcast_y(y, w, h, dir_x, plane_x, dir_y, plane_y,
-                  pos_x, pos_y)
-
-            if do_continue:
-                # Choose texture, draw pixel
-                floor_texture = colormap[3]
-                ceiling_texture = colormap[6]
-
-                for x in range(w):
-                    floorcast_x2(buffer, x, y, h, floor_texture, ceiling_texture, floor_x, floor_y, fstep_x, fstep_y)
-
-        # Raycasting for wall textures
-        for x in range(w):
-            do_continue, tex_pos, y1, y2, step, tex_num, tex_x = wallcast(x, w, h, dir_x, plane_x, dir_y, plane_y,
-                  pos_x, pos_y)
-
-            if do_continue:
-                texture = colormap[tex_num]
-
-                for y in range(y1, y2):
-                    copy_color(buffer, x, y, h, texture, tex_x, int(tex_pos + step * (y - y1)) & (TEX_HEIGHT - 1))
-
-        # Update display
-        caption: str = "Textured Raycaster | FPS = {0:.2f}".format(clock.get_fps())
-        update_display(surface, display, buffer, caption)
-        buffer[:] = b'\x00' * len(buffer)
-
-        # Grab user input
-        dt: float = clock.tick(FPS) * 0.001
-        pos_x, pos_y, dir_x, dir_y, plane_x, plane_y = update_events(dt, pos_x, pos_y, dir_x, dir_y, plane_x, plane_y)
+        pos_x, pos_y, dir_x, dir_y, plane_x, plane_y = main_loop(pos_x, pos_y, dir_x, dir_y, plane_x, plane_y, display, surface, clock, colormap, w, h, buffer)
 
 
 if __name__ == "__main__":
