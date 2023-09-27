@@ -1,3 +1,12 @@
+# Tweaked to work with GraalPy Standalone
+
+This project runs just fine (and fast!) on GraalPy 23.1. This fork includes some tweaks to build standalone binaries that just work with it.
+```
+graalpy -m standalone native -m pypy-raycaster --venv my-venv-with-pygame-pillow-numpy -o pypy-raycaster.exe
+```
+
+Now "pypy-raycaster.exe" includes everything you need to run this demo: on macOS and Linux (Windows coming soon).
+
 # PyPy Raycaster
 
 ## Overview
